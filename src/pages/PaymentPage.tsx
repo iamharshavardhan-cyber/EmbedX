@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import GooglePayButton from '@google-pay/button-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '@/context/AuthContext';
 import { getStudentRegistration } from '@/services/registrationService';
 import {
@@ -14,10 +16,12 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  QrCode as QrCodeIcon,
   ArrowRight,
   ShieldCheck,
-  IndianRupee,
+  Copy,
+  Check,
+  ExternalLink,
+  Smartphone,
 } from 'lucide-react';
 
 export const PaymentPage: React.FC = () => {
@@ -36,6 +40,10 @@ export const PaymentPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [copiedUpi, setCopiedUpi] = useState(false);
+
+  const receiverUpiId = config?.upiId || '9182550395@upi';
+  const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=EmbedX%20PCB%20Workshop&am=${WORKSHOP_FEE}&cu=INR&tn=Registration%20Fee`;
 
   useEffect(() => {
     if (!currentUser) return;
@@ -61,6 +69,12 @@ export const PaymentPage: React.FC = () => {
 
     loadData();
   }, [currentUser]);
+
+  const handleCopyUpi = () => {
+    navigator.clipboard.writeText(receiverUpiId);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 2500);
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -178,11 +192,12 @@ export const PaymentPage: React.FC = () => {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FF2D2D]/10 text-[#FF2D2D] text-xs font-bold uppercase tracking-wider mb-3 border border-[#FF2D2D]/30">
             Step 2 of 2 — Workshop Fee
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Payment Verification</h1>
-          <p className="text-gray-400 mt-2">Complete your workshop registration with UPI payment.</p>
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Google Pay & UPI Payment</h1>
+          <p className="text-gray-400 mt-2">Pay ₹70 via Google Pay, UPI deep link, or QR scan.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column: GPay & UPI Details */}
           <div className="space-y-6">
             <div className="card-elevated p-6 space-y-4 border border-[#242436] bg-[#0f0f16]">
               <span className="form-label text-gray-400">Workshop Fee</span>
@@ -206,37 +221,112 @@ export const PaymentPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="card-elevated p-6 space-y-4 text-center border border-[#242436] bg-[#0f0f16]">
-              <h3 className="text-sm font-bold text-white flex items-center justify-center gap-2">
-                <QrCodeIcon className="w-4 h-4 text-[#FF2D2D]" />
-                <span>Scan UPI QR Code</span>
-              </h3>
-
-              {config?.qrImageUrl ? (
-                <div className="p-3 bg-white rounded-xl border border-gray-200 inline-block mx-auto">
-                  <img
-                    src={config.qrImageUrl}
-                    alt="UPI QR Code"
-                    className="w-44 h-44 object-contain mx-auto"
-                  />
+            {/* Google Pay SDK & Instant Launch Box */}
+            <div className="card-elevated p-6 space-y-5 text-center border border-[#242436] bg-[#0f0f16]">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF2D2D]/10 text-[#FF2D2D] text-[10px] font-extrabold uppercase tracking-widest border border-[#FF2D2D]/30">
+                  <span>GOOGLE PAY & UPI GATEWAY</span>
                 </div>
-              ) : (
-                <div className="w-48 h-48 bg-[#0a0a10] border border-dashed border-[#2a2a3e] rounded-xl flex flex-col items-center justify-center p-4 mx-auto text-gray-400 space-y-2">
-                  <IndianRupee className="w-8 h-8 text-[#FF2D2D]" />
-                  <p className="text-xs font-mono text-white">UPI ID: {config?.upiId || 'embedx@upi'}</p>
-                  <span className="text-[10px] text-gray-500">
-                    Scan using GPay, PhonePe, Paytm or Cred
-                  </span>
-                </div>
-              )}
+                <h3 className="text-base font-bold text-white flex items-center justify-center gap-2">
+                  <Smartphone className="w-4 h-4 text-[#FF2D2D]" />
+                  <span>Instant UPI Payment</span>
+                </h3>
+              </div>
 
-              <div className="text-xs font-mono bg-[#09090e] p-3 rounded-lg border border-[#222234] break-all">
-                <span className="text-gray-500 block text-[10px] uppercase mb-1">UPI ID</span>
-                <span className="text-white">{config?.upiId || 'embedx@upi'}</span>
+              {/* Direct GPay / Mobile App Launch Button */}
+              <a
+                href={upiPayString}
+                className="btn-pill w-full py-3.5 bg-gradient-to-r from-[#FF2D2D] to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-full shadow-[0_0_20px_rgba(255,45,45,0.4)] flex items-center justify-center gap-2.5 transition-all text-sm"
+              >
+                <span>Pay ₹70 via GPay / UPI App</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+
+              {/* Official Google Pay Button Component */}
+              <div className="pt-2 flex justify-center">
+                <GooglePayButton
+                  environment="TEST"
+                  buttonColor="white"
+                  buttonType="pay"
+                  buttonSizeMode="fill"
+                  paymentRequest={{
+                    apiVersion: 2,
+                    apiVersionMinor: 0,
+                    allowedPaymentMethods: [
+                      {
+                        type: 'CARD',
+                        parameters: {
+                          allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+                          allowedCardNetworks: ['MASTERCARD', 'VISA'],
+                        },
+                        tokenizationSpecification: {
+                          type: 'PAYMENT_GATEWAY',
+                          parameters: {
+                            gateway: 'example',
+                            gatewayMerchantId: 'exampleGatewayMerchantId',
+                          },
+                        },
+                      },
+                    ],
+                    merchantInfo: {
+                      merchantId: '12345678901234567890',
+                      merchantName: 'EmbedX PCB Workshop',
+                    },
+                    transactionInfo: {
+                      totalPriceStatus: 'FINAL',
+                      totalPriceLabel: 'Total',
+                      totalPrice: '70.00',
+                      currencyCode: 'INR',
+                      countryCode: 'IN',
+                    },
+                  }}
+                  onLoadPaymentData={(paymentRequest) => {
+                    console.log('Google Pay payment data:', paymentRequest);
+                  }}
+                  onError={(err) => {
+                    console.log('Google Pay error:', err);
+                  }}
+                />
+              </div>
+
+              {/* QR Code Container */}
+              <div className="pt-3 border-t border-[#1f1f2e] space-y-3">
+                <span className="text-xs text-gray-400 font-medium block">
+                  Or scan with GPay / PhonePe / Paytm:
+                </span>
+                <div className="p-4 bg-white rounded-2xl border-4 border-[#FF2D2D] inline-block mx-auto shadow-lg">
+                  <QRCodeSVG value={upiPayString} size={170} level="H" includeMargin={false} />
+                </div>
+              </div>
+
+              {/* Copyable UPI ID Box */}
+              <div className="p-3 bg-[#09090e] rounded-xl border border-[#222234] flex items-center justify-between gap-2 text-xs font-mono">
+                <div className="text-left overflow-hidden">
+                  <span className="text-gray-500 block text-[9px] uppercase tracking-wider mb-0.5">UPI ID</span>
+                  <span className="text-white font-bold truncate block">{receiverUpiId}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyUpi}
+                  className="px-3 py-1.5 rounded-lg bg-[#161622] hover:bg-[#1a1a2a] border border-[#2a2a3e] text-[#FF2D2D] font-bold text-[11px] flex items-center gap-1.5 transition-colors shrink-0"
+                >
+                  {copiedUpi ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
 
+          {/* Right Column: Submission & History */}
           <div className="lg:col-span-2 space-y-6">
             <div className="card-elevated p-6 flex items-center justify-between gap-4 flex-wrap border border-[#242436] bg-[#0f0f16]">
               <div>
@@ -271,8 +361,7 @@ export const PaymentPage: React.FC = () => {
                     <span>Submit Payment Evidence</span>
                   </h2>
                   <p className="text-sm text-gray-400 mt-2">
-                    After paying via UPI, enter your UTR transaction ID and upload a PNG/JPEG
-                    screenshot.
+                    After paying ₹70 to <span className="text-white font-mono font-bold">{receiverUpiId}</span>, enter your UTR transaction ID and upload a PNG/JPEG screenshot.
                   </p>
                 </div>
 
