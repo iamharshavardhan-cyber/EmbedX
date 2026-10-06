@@ -45,6 +45,7 @@ export const PaymentPage: React.FC = () => {
   const receiverUpiId = config?.upiId || '9052899812-2@ybl';
   const receiverName = 'DHUDHYALA CHANDRA KANTH';
   const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=${encodeURIComponent(receiverName)}&am=${WORKSHOP_FEE}&cu=INR`;
+  const gpayIntentUrl = `intent://pay?pa=${receiverUpiId}&pn=${encodeURIComponent(receiverName)}&am=${WORKSHOP_FEE}&cu=INR#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
 
   useEffect(() => {
     if (!currentUser) return;
@@ -234,18 +235,23 @@ export const PaymentPage: React.FC = () => {
                 </h3>
               </div>
 
-              {/* Copy UPI ID & Launch App Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  handleCopyUpi();
-                  window.location.href = upiPayString;
-                }}
+              {/* Direct GPay / Mobile App Launch Button */}
+              <a
+                href={upiPayString}
                 className="btn-pill w-full py-3.5 bg-gradient-to-r from-[#FF2D2D] to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-full shadow-[0_0_20px_rgba(255,45,45,0.4)] flex items-center justify-center gap-2.5 transition-all text-sm"
               >
-                <span>{copiedUpi ? 'UPI ID Copied! Opening App...' : 'Copy UPI ID & Pay ₹70'}</span>
+                <span>Pay ₹70 via GPay / UPI App</span>
                 <ExternalLink className="w-4 h-4" />
-              </button>
+              </a>
+
+              {/* Direct Google Pay App Button */}
+              <a
+                href={gpayIntentUrl}
+                className="w-full py-3 bg-[#1a73e8] hover:bg-[#1557b0] text-white font-bold rounded-full flex items-center justify-center gap-2.5 transition-all text-sm shadow-md"
+              >
+                <span>Open Directly in Google Pay</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
 
               {/* Official Google Pay Button Component */}
               <div className="pt-2 flex justify-center">
@@ -287,9 +293,14 @@ export const PaymentPage: React.FC = () => {
                   }}
                   onLoadPaymentData={(paymentRequest) => {
                     console.log('Google Pay payment data:', paymentRequest);
+                    window.location.href = gpayIntentUrl;
+                  }}
+                  onClick={() => {
+                    window.location.href = gpayIntentUrl;
                   }}
                   onError={(err) => {
-                    console.log('Google Pay error:', err);
+                    console.log('Google Pay fallback to direct intent:', err);
+                    window.location.href = gpayIntentUrl;
                   }}
                 />
               </div>
