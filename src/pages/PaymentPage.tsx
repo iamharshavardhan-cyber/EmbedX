@@ -45,7 +45,6 @@ export const PaymentPage: React.FC = () => {
   const receiverUpiId = config?.upiId || '9052899812-2@ybl';
   const receiverName = 'DHUDHYALA CHANDRA KANTH';
   const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=${encodeURIComponent(receiverName)}&am=${WORKSHOP_FEE}&cu=INR`;
-  const gpayIntentUrl = `intent://pay?pa=${receiverUpiId}&pn=${encodeURIComponent(receiverName)}&am=${WORKSHOP_FEE}&cu=INR#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
 
   useEffect(() => {
     if (!currentUser) return;
@@ -244,15 +243,6 @@ export const PaymentPage: React.FC = () => {
                 <ExternalLink className="w-4 h-4" />
               </a>
 
-              {/* Direct Google Pay App Button */}
-              <a
-                href={gpayIntentUrl}
-                className="w-full py-3 bg-[#1a73e8] hover:bg-[#1557b0] text-white font-bold rounded-full flex items-center justify-center gap-2.5 transition-all text-sm shadow-md"
-              >
-                <span>Open Directly in Google Pay</span>
-                <ExternalLink className="w-4 h-4" />
-              </a>
-
               {/* Official Google Pay Button Component */}
               <div className="pt-2 flex justify-center">
                 <GooglePayButton
@@ -293,14 +283,14 @@ export const PaymentPage: React.FC = () => {
                   }}
                   onLoadPaymentData={(paymentRequest) => {
                     console.log('Google Pay payment data:', paymentRequest);
-                    window.location.href = gpayIntentUrl;
+                    window.location.href = upiPayString;
                   }}
                   onClick={() => {
-                    window.location.href = gpayIntentUrl;
+                    window.location.href = upiPayString;
                   }}
                   onError={(err) => {
                     console.log('Google Pay fallback to direct intent:', err);
-                    window.location.href = gpayIntentUrl;
+                    window.location.href = upiPayString;
                   }}
                 />
               </div>
@@ -338,18 +328,6 @@ export const PaymentPage: React.FC = () => {
                     </>
                   )}
                 </button>
-              </div>
-
-              {/* Security Guidance Note */}
-              <div className="p-3 rounded-xl bg-[#140b0d] border border-[#FF2D2D]/20 text-[11px] text-gray-300 text-left space-y-1">
-                <p className="font-bold text-[#FF2D2D] flex items-center gap-1">
-                  <span>💡 If payment is declined by PhonePe / GPay:</span>
-                </p>
-                <ol className="list-decimal list-inside space-y-0.5 text-gray-400 text-[10.5px]">
-                  <li>Copy the UPI ID: <strong className="text-white font-mono">{receiverUpiId}</strong></li>
-                  <li>Open PhonePe / GPay / Paytm & tap <strong>"To UPI ID"</strong></li>
-                  <li>Paste <strong className="text-white font-mono">{receiverUpiId}</strong> & pay ₹70 directly</li>
-                </ol>
               </div>
             </div>
           </div>
