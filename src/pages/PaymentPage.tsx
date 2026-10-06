@@ -42,7 +42,7 @@ export const PaymentPage: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [copiedUpi, setCopiedUpi] = useState(false);
 
-  const receiverUpiId = config?.upiId || '9182550395@upi';
+  const receiverUpiId = config?.upiId || '9052899812-2@ybl';
   const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=EmbedX%20PCB%20Workshop&am=${WORKSHOP_FEE}&cu=INR&tn=Registration%20Fee`;
 
   useEffect(() => {
