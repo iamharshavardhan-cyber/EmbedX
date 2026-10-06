@@ -43,7 +43,8 @@ export const PaymentPage: React.FC = () => {
   const [copiedUpi, setCopiedUpi] = useState(false);
 
   const receiverUpiId = config?.upiId || '9052899812-2@ybl';
-  const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=EmbedX%20PCB%20Workshop&am=${WORKSHOP_FEE}&cu=INR&tn=Registration%20Fee`;
+  const receiverName = 'DHUDHYALA CHANDRA KANTH';
+  const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=${encodeURIComponent(receiverName)}&am=${WORKSHOP_FEE}&cu=INR`;
 
   useEffect(() => {
     if (!currentUser) return;
@@ -233,14 +234,18 @@ export const PaymentPage: React.FC = () => {
                 </h3>
               </div>
 
-              {/* Direct GPay / Mobile App Launch Button */}
-              <a
-                href={upiPayString}
+              {/* Copy UPI ID & Launch App Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleCopyUpi();
+                  window.location.href = upiPayString;
+                }}
                 className="btn-pill w-full py-3.5 bg-gradient-to-r from-[#FF2D2D] to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-full shadow-[0_0_20px_rgba(255,45,45,0.4)] flex items-center justify-center gap-2.5 transition-all text-sm"
               >
-                <span>Pay ₹70 via GPay / UPI App</span>
+                <span>{copiedUpi ? 'UPI ID Copied! Opening App...' : 'Copy UPI ID & Pay ₹70'}</span>
                 <ExternalLink className="w-4 h-4" />
-              </a>
+              </button>
 
               {/* Official Google Pay Button Component */}
               <div className="pt-2 flex justify-center">
@@ -322,6 +327,18 @@ export const PaymentPage: React.FC = () => {
                     </>
                   )}
                 </button>
+              </div>
+
+              {/* Security Guidance Note */}
+              <div className="p-3 rounded-xl bg-[#140b0d] border border-[#FF2D2D]/20 text-[11px] text-gray-300 text-left space-y-1">
+                <p className="font-bold text-[#FF2D2D] flex items-center gap-1">
+                  <span>💡 If payment is declined by PhonePe / GPay:</span>
+                </p>
+                <ol className="list-decimal list-inside space-y-0.5 text-gray-400 text-[10.5px]">
+                  <li>Copy the UPI ID: <strong className="text-white font-mono">{receiverUpiId}</strong></li>
+                  <li>Open PhonePe / GPay / Paytm & tap <strong>"To UPI ID"</strong></li>
+                  <li>Paste <strong className="text-white font-mono">{receiverUpiId}</strong> & pay ₹70 directly</li>
+                </ol>
               </div>
             </div>
           </div>
