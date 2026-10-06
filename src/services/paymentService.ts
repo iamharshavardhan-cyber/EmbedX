@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { SUPABASE_FUNCTIONS_URL } from '@/lib/supabase';
-import { PaymentAttempt, WORKSHOP_FEE, PaymentConfig } from '@/types';
+import { PaymentAttempt, PaymentConfig } from '@/types';
 
 export interface SubmitPaymentParams {
   utr: string;
@@ -30,9 +30,30 @@ export const submitPaymentEvidence = async (
   uid: string,
   params: SubmitPaymentParams
 ): Promise<PaymentAttempt> => {
-  const normalizedUtr = params.utr.trim();
-  if (normalizedUtr.length < 8) {
-    throw new Error('UTR / Transaction ID must be at least 8 characters long.');
+  // 1. Normalize UTR: trim + uppercase
+  const normalizedUtr = params.utr.trim().toUpperCase();
+  if (normalizedUtr.length < 12) {
+    throw new Error('UTR / Transaction ID must be at least 12 characters long.');
+  }
+
+  // 2. Always read upiId and amount from Firestore config/payment
+  const config = await getPaymentConfig();
+  const expectedAmount = config?.amount || config?.expectedAmount;
+  if (!config || !config.upiId || !expectedAmount) {
+    throw new Error('Payment configuration unavailable. Contact organizers.');
+  }
+
+  // 3. Query usedUtrs/{normalizedUtr} to prevent UTR reuse
+  const usedUtrRef = doc(db, 'usedUtrs', normalizedUtr);
+  const usedUtrSnap = await getDoc(usedUtrRef);
+  if (usedUtrSnap.exists()) {
+    throw new Error('This UTR has already been used.');
+  }
+
+  // 4. Count existing paymentAttempts for user (max 3 attempts)
+  const existingAttempts = await getPaymentAttempts(uid);
+  if (existingAttempts.length >= 3) {
+    throw new Error('Maximum payment attempts reached. Contact organizers.');
   }
 
   const file = params.file;
@@ -52,7 +73,7 @@ export const submitPaymentEvidence = async (
 
   const extension = file.type.split('/')[1]?.toLowerCase() === 'png' ? 'png' : 'jpg';
 
-  // 1. Get Firebase ID Token
+  // 5. Get Firebase ID Token
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('User authentication session expired. Please sign in again.');
@@ -64,7 +85,7 @@ export const submitPaymentEvidence = async (
   const newAttemptDocRef = doc(attemptCollectionRef);
   const attemptId = newAttemptDocRef.id;
 
-  // 2. Call Supabase Edge Function to get signed upload URL
+  // 6. Call Supabase Edge Function to get signed upload URL
   const uploadFunctionEndpoint = `${SUPABASE_FUNCTIONS_URL}/generate-payment-upload-url`;
   
   const edgeResponse = await fetch(uploadFunctionEndpoint, {
@@ -87,7 +108,7 @@ export const submitPaymentEvidence = async (
 
   const { signedUrl, path } = edgeData;
 
-  // 3. Upload file directly to Supabase Storage using signed URL
+  // 7. Upload file directly to Supabase Storage using signed URL
   const uploadResponse = await fetch(signedUrl, {
     method: 'PUT',
     headers: {
@@ -100,16 +121,16 @@ export const submitPaymentEvidence = async (
     throw new Error(`Failed to upload payment screenshot to storage. (Status ${uploadResponse.status})`);
   }
 
-  // 4. Create immutable payment attempt document in Firestore
+  // 8. Create immutable payment attempt document in Firestore
   await setDoc(newAttemptDocRef, {
     utr: normalizedUtr,
     screenshotRef: path,
-    expectedAmount: WORKSHOP_FEE, // FIXED AT 70
+    expectedAmount: expectedAmount,
     status: 'submitted',
     submittedAt: serverTimestamp(),
   });
 
-  // 5. Update parent registration paymentStatus
+  // 9. Update parent registration paymentStatus
   const regRef = doc(db, 'registrations', uid);
   await updateDoc(regRef, {
     paymentStatus: 'submitted',
@@ -121,7 +142,7 @@ export const submitPaymentEvidence = async (
     id: attemptId,
     utr: normalizedUtr,
     screenshotRef: path,
-    expectedAmount: WORKSHOP_FEE,
+    expectedAmount: expectedAmount,
     status: 'submitted',
     submittedAt: new Date().toISOString(),
   };

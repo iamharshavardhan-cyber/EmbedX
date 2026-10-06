@@ -9,7 +9,7 @@ import {
   getPaymentAttempts,
   getPaymentConfig,
 } from '@/services/paymentService';
-import { Registration, PaymentAttempt, PaymentConfig, WORKSHOP_FEE } from '@/types';
+import { Registration, PaymentAttempt, PaymentConfig } from '@/types';
 import {
   CreditCard,
   Upload,
@@ -42,9 +42,14 @@ export const PaymentPage: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [copiedUpi, setCopiedUpi] = useState(false);
 
-  const receiverUpiId = config?.upiId || '9052899812-2@ybl';
-  const receiverName = 'DHUDHYALA CHANDRA KANTH';
-  const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=${encodeURIComponent(receiverName)}&am=${WORKSHOP_FEE}&cu=INR`;
+  const receiverUpiId = config?.upiId || '';
+  const receiverName = config?.payeeName || 'EMBEDX PCB WORKSHOP';
+  const feeAmount = config?.amount || config?.expectedAmount || 0;
+  const isConfigValid = !!config && !!config.upiId && !!feeAmount;
+
+  const upiPayString = isConfigValid
+    ? `upi://pay?pa=${receiverUpiId}&pn=${encodeURIComponent(receiverName)}&am=${feeAmount}&cu=INR`
+    : '';
 
   useEffect(() => {
     if (!currentUser) return;
@@ -72,6 +77,7 @@ export const PaymentPage: React.FC = () => {
   }, [currentUser]);
 
   const handleCopyUpi = () => {
+    if (!receiverUpiId) return;
     navigator.clipboard.writeText(receiverUpiId);
     setCopiedUpi(true);
     setTimeout(() => setCopiedUpi(false), 2500);
@@ -83,13 +89,13 @@ export const PaymentPage: React.FC = () => {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setError('Selected image exceeds 5 MB limit. Please select a smaller screenshot.');
+      setError('File size exceeds the 5 MB limit. Please compress or select a smaller image.');
       return;
     }
 
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
     if (!allowedTypes.includes(file.type.toLowerCase())) {
-      setError('Only PNG and JPEG file formats are accepted.');
+      setError('Only PNG and JPEG file formats are supported.');
       return;
     }
 
@@ -111,13 +117,23 @@ export const PaymentPage: React.FC = () => {
       return;
     }
 
+    if (!isConfigValid) {
+      setError('Payment configuration unavailable. Contact organizers.');
+      return;
+    }
+
     if (!selectedFile) {
       setError('Please select a payment screenshot image file.');
       return;
     }
 
-    if (utr.trim().length < 8) {
-      setError('Please enter a valid 12-digit UPI UTR / Transaction Reference Number.');
+    if (utr.trim().length < 12) {
+      setError('UTR / Transaction ID must be at least 12 characters long.');
+      return;
+    }
+
+    if (attempts.length >= 3) {
+      setError('Maximum payment attempts reached. Contact organizers.');
       return;
     }
 
@@ -203,7 +219,7 @@ export const PaymentPage: React.FC = () => {
             <div className="card-elevated p-6 space-y-4 border border-[#242436] bg-[#0f0f16]">
               <span className="form-label text-gray-400">Workshop Fee</span>
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-black text-white">₹{WORKSHOP_FEE}</span>
+                <span className="text-4xl font-black text-white">₹{feeAmount || 70}</span>
                 <span className="text-xs text-gray-400">/ student</span>
               </div>
               <div className="text-sm text-gray-300 space-y-2 pt-4 border-t border-[#1f1f2e]">
@@ -223,16 +239,25 @@ export const PaymentPage: React.FC = () => {
             </div>
 
             {/* Google Pay SDK & Instant Launch Box */}
-            <div className="card-elevated p-6 space-y-5 text-center border border-[#242436] bg-[#0f0f16]">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF2D2D]/10 text-[#FF2D2D] text-[10px] font-extrabold uppercase tracking-widest border border-[#FF2D2D]/30">
-                  <span>GOOGLE PAY & UPI GATEWAY</span>
-                </div>
-                <h3 className="text-base font-bold text-white flex items-center justify-center gap-2">
-                  <Smartphone className="w-4 h-4 text-[#FF2D2D]" />
-                  <span>Instant UPI Payment</span>
-                </h3>
+            {!isConfigValid ? (
+              <div className="card-elevated p-8 text-center border border-red-500/30 bg-[#0f0f16] space-y-3">
+                <AlertCircle className="w-10 h-10 text-[#FF2D2D] mx-auto" />
+                <h3 className="text-base font-bold text-white">Payment Configuration Unavailable</h3>
+                <p className="text-xs text-gray-400">
+                  Payment configuration unavailable. Contact organizers.
+                </p>
               </div>
+            ) : (
+              <div className="card-elevated p-6 space-y-5 text-center border border-[#242436] bg-[#0f0f16]">
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF2D2D]/10 text-[#FF2D2D] text-[10px] font-extrabold uppercase tracking-widest border border-[#FF2D2D]/30">
+                    <span>GOOGLE PAY & UPI GATEWAY</span>
+                  </div>
+                  <h3 className="text-base font-bold text-white flex items-center justify-center gap-2">
+                    <Smartphone className="w-4 h-4 text-[#FF2D2D]" />
+                    <span>Instant UPI Payment</span>
+                  </h3>
+                </div>
 
               {/* Direct GPay / Mobile App Launch Button */}
               <a
@@ -330,6 +355,7 @@ export const PaymentPage: React.FC = () => {
                 </button>
               </div>
             </div>
+            )}
           </div>
 
           {/* Right Column: Submission & History */}

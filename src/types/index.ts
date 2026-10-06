@@ -59,13 +59,14 @@ export interface Registration {
   createdAt: any;
   updatedAt: any;
   lastPaymentSubmittedAt?: any;
+  rejectionReason?: string;
 }
 
 export interface PaymentAttempt {
   id: string;
   utr: string;
   screenshotRef: string;
-  expectedAmount: number; // Must be 70
+  expectedAmount: number;
   status: 'submitted';
   submittedAt: any;
 }
@@ -77,8 +78,12 @@ export interface UserRoleDoc {
 
 export interface PaymentConfig {
   upiId: string;
-  qrImageUrl: string;
-  expectedAmount: number; // Must be 70
+  payeeName?: string;
+  amount: number;
+  expectedAmount?: number;
+  qrImageUrl?: string;
+  currency?: string;
+  note?: string;
 }
 
 export const BRANCH_TO_PIN_PREFIX: Record<BranchCode, PinPrefix> = {

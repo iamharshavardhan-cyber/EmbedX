@@ -1,114 +1,81 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Default Deny All
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Helper Functions
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
     }
-
-    function getUserRole() {
-      let roleDoc = /databases/$(database)/documents/roles/$(request.auth.uid);
-      return exists(roleDoc) ? get(roleDoc).data.role : 'student';
+    function userRole() {
+      return get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role;
     }
-
-    function isAdminOrSuperAdmin() {
-      let role = getUserRole();
-      return isAuthenticated() && (role == 'admin' || role == 'super_admin');
+    function isAdmin() {
+      return isSignedIn() && userRole() in ['admin', 'super_admin'];
     }
-
+    function isSuperAdmin() {
+      return isSignedIn() && userRole() == 'super_admin';
+    }
     function isScannerOrAdmin() {
-      let role = getUserRole();
-      return isAuthenticated() && (role == 'scanner' || role == 'admin' || role == 'super_admin');
+      return isSignedIn() && userRole() in ['scanner', 'admin', 'super_admin'];
     }
 
-    function isValidPinPattern(pin) {
-      return pin.matches('^26054-(cs|ec|bm|mee|ei|es|cps|ai|ccb|sct)-0[0-9]{2}$');
+    // Roles — only super_admin can write. Users can read their own role.
+    match /roles/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
     }
 
-    function isValidBranchPinPair(branch, pin) {
-      return (branch == 'cse' && pin.matches('^26054-cs-0[0-9]{2}$')) ||
-             (branch == 'ece' && pin.matches('^26054-ec-0[0-9]{2}$')) ||
-             (branch == 'bme' && pin.matches('^26054-bm-0[0-9]{2}$')) ||
-             (branch == 'mee' && pin.matches('^26054-mee-0[0-9]{2}$')) ||
-             (branch == 'ei'  && pin.matches('^26054-ei-0[0-9]{2}$')) ||
-             (branch == 'es'  && pin.matches('^26054-es-0[0-9]{2}$')) ||
-             (branch == 'cps' && pin.matches('^26054-cps-0[0-9]{2}$')) ||
-             (branch == 'aiml'&& pin.matches('^26054-ai-0[0-9]{2}$')) ||
-             (branch == 'ccb' && pin.matches('^26054-ccb-0[0-9]{2}$')) ||
-             (branch == 'sct' && pin.matches('^26054-sct-0[0-9]{2}$'));
-    }
+    // Registrations — student owns their doc; admin full access
+    match /registrations/{uid} {
+      allow read: if isOwner(uid) || isAdmin() || isScannerOrAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.data.paymentStatus == 'pending'
+        && request.resource.data.registrationStatus == 'pending'
+        && request.resource.data.ticketStatus == 'unissued';
+      allow update: if isAdmin()
+        || (isOwner(uid)
+            && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['paymentStatus', 'lastPaymentSubmittedAt', 'updatedAt'])
+            && request.resource.data.paymentStatus in ['pending', 'submitted']);
+      allow delete: if isSuperAdmin();
 
-    // Registrations Collection
-    match /registrations/{userId} {
-      allow read: if isOwner(userId) || isScannerOrAdmin();
-      
-      allow create: if isOwner(userId) &&
-        request.resource.data.paymentStatus == 'pending' &&
-        request.resource.data.registrationStatus == 'pending' &&
-        request.resource.data.ticketStatus == 'unissued' &&
-        request.resource.data.ticketId == null &&
-        request.resource.data.attendance.day1.checkedIn == false &&
-        request.resource.data.attendance.day2.checkedIn == false &&
-        isValidBranchPinPair(request.resource.data.branch, request.resource.data.pin) &&
-        request.resource.data.keys().hasAll(['fullName', 'pin', 'phoneNumber', 'branch', 'priorKnowledge', 'learningExpectations', 'paymentStatus', 'registrationStatus', 'ticketStatus', 'ticketId', 'attendance', 'createdAt', 'updatedAt']);
-
-      allow update: if isAdminOrSuperAdmin() ||
-        // Scanner or Admin attendance check-in update
-        (isScannerOrAdmin() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendance', 'updatedAt']) &&
-          request.resource.data.ticketStatus == 'issued') ||
-        // Student status update when submitting payment attempt
-        (isOwner(userId) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentStatus', 'lastPaymentSubmittedAt', 'updatedAt']) &&
-          request.resource.data.paymentStatus == 'submitted');
-
-      allow delete: if false;
-
-      // Subcollection: Immutable Payment Attempts
+      // Payment attempts subcollection
       match /paymentAttempts/{attemptId} {
-        allow read: if isOwner(userId) || isAdminOrSuperAdmin();
-        allow create: if isOwner(userId) &&
-          request.resource.data.expectedAmount == 70 &&
-          request.resource.data.status == 'submitted' &&
-          request.resource.data.submittedAt == request.time &&
-          request.resource.data.utr.size() >= 8 &&
-          request.resource.data.screenshotRef.size() > 0;
-        allow update, delete: if false;
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if isOwner(uid)
+          && request.resource.data.status == 'submitted'
+          && request.resource.data.keys().hasAll(['utr', 'screenshotRef', 'expectedAmount', 'status', 'submittedAt']);
+        allow update, delete: if isAdmin();
       }
     }
 
-    // Atomic PIN Reservation Collection
-    match /pins/{pin} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
-        isValidPinPattern(pin) &&
-        request.resource.data.uid == request.auth.uid;
-      allow update, delete: if false;
+    // Pins — claim once via transaction
+    match /pins/{pinId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && !exists(/databases/$(database)/documents/pins/$(pinId));
+      allow update, delete: if isSuperAdmin();
     }
 
-    // Role Management Collection
-    match /roles/{userId} {
-      allow read: if isOwner(userId) || isAdminOrSuperAdmin();
-      allow write: if isAuthenticated() && getUserRole() == 'super_admin';
+    // Config (payment UPI etc.) — public read, admin write
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // Payment Config Collection
-    match /config/payment {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() &&
-        getUserRole() == 'super_admin' &&
-        request.resource.data.expectedAmount == 70;
+    // Used UTRs — prevent reuse
+    match /usedUtrs/{utrId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() || isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // Catch-all deny
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

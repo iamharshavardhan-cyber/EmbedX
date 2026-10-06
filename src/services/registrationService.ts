@@ -33,7 +33,7 @@ export const validateBranchAndPin = (
   if (!PIN_REGEX.test(normalizedPin)) {
     return {
       valid: false,
-      error: 'Invalid PIN format. Expected format: 26054-[prefix]-0XX (e.g., 26054-cs-038)',
+      error: 'Invalid PIN format. Expected format: 26054-cs-038 (1st year only)',
     };
   }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
 import {
   Cpu,
   Layers,
@@ -17,7 +18,10 @@ import {
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
+  const { currentUser } = useAuth();
   const [selectedTrack, setSelectedTrack] = useState<number>(0);
+
+  const registerTarget = currentUser ? '/register' : '/login?mode=signup';
 
   const tracks = [
     {
@@ -181,7 +185,7 @@ export const LandingPage: React.FC = () => {
               {/* CTAs */}
               <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-4 mt-10">
                 <Link
-                  to="/register"
+                  to={registerTarget}
                   className="btn-pill text-base px-8 py-4 shadow-[0_0_30px_rgba(255,45,45,0.45)] hover:shadow-[0_0_45px_rgba(255,45,45,0.75)]"
                 >
                   <span>Register Now</span>
@@ -491,7 +495,7 @@ export const LandingPage: React.FC = () => {
 
             <div className="mt-10">
               <Link
-                to="/register"
+                to={registerTarget}
                 className="btn-pill text-lg px-10 py-4 shadow-[0_0_35px_rgba(255,45,45,0.5)] hover:shadow-[0_0_55px_rgba(255,45,45,0.85)]"
               >
                 <span>Register Now (₹70)</span>

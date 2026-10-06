@@ -9,7 +9,7 @@ import {
   exportRegistrationsCSV,
 } from '@/services/adminService';
 import { getAdminViewUrl, getPaymentAttempts, getPaymentConfig } from '@/services/paymentService';
-import { Registration, PaymentAttempt, UserRole, WORKSHOP_FEE } from '@/types';
+import { Registration, PaymentAttempt, UserRole } from '@/types';
 import {
   Shield,
   Search,
@@ -50,6 +50,8 @@ export const AdminPage: React.FC = () => {
   const [roleMsg, setRoleMsg] = useState<string | null>(null);
 
   const [upiId, setUpiId] = useState('');
+  const [payeeName, setPayeeName] = useState('EMBEDX PCB WORKSHOP');
+  const [amount, setAmount] = useState(70);
   const [qrImageUrl, setQrImageUrl] = useState('');
   const [configMsg, setConfigMsg] = useState<string | null>(null);
   const [updatingConfig, setUpdatingConfig] = useState(false);
@@ -63,6 +65,8 @@ export const AdminPage: React.FC = () => {
       const cfg = await getPaymentConfig();
       if (cfg) {
         setUpiId(cfg.upiId || '');
+        setPayeeName(cfg.payeeName || 'EMBEDX PCB WORKSHOP');
+        setAmount(cfg.amount || cfg.expectedAmount || 70);
         setQrImageUrl(cfg.qrImageUrl || '');
       }
     } catch (err) {
@@ -102,7 +106,9 @@ export const AdminPage: React.FC = () => {
 
   const handleApprove = async (reg: Registration) => {
     try {
-      const newTicketId = await approvePaymentAndIssueTicket(reg.id, reg.branch);
+      const studentAttempts = await getPaymentAttempts(reg.id);
+      const utr = studentAttempts.length > 0 ? studentAttempts[0].utr : undefined;
+      const newTicketId = await approvePaymentAndIssueTicket(reg.id, reg.branch, utr);
       setRegistrations((prev) =>
         prev.map((r) =>
           r.id === reg.id
@@ -125,10 +131,10 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleReject = async (reg: Registration) => {
-    if (!confirm(`Are you sure you want to reject payment for ${reg.fullName}?`)) return;
+    const reason = prompt(`Optional rejection reason for ${reg.fullName} (e.g. Invalid UTR / Screenshot blurry):`) || '';
 
     try {
-      await rejectPayment(reg.id);
+      await rejectPayment(reg.id, reason);
       setRegistrations((prev) =>
         prev.map((r) =>
           r.id === reg.id
@@ -136,6 +142,7 @@ export const AdminPage: React.FC = () => {
                 ...r,
                 paymentStatus: 'rejected',
                 registrationStatus: 'rejected',
+                rejectionReason: reason,
               }
             : r
         )
@@ -168,8 +175,8 @@ export const AdminPage: React.FC = () => {
     setUpdatingConfig(true);
 
     try {
-      await updatePaymentConfig(upiId, qrImageUrl);
-      setConfigMsg('Payment display configuration updated successfully (Fee locked at ₹70).');
+      await updatePaymentConfig(upiId, payeeName, Number(amount), qrImageUrl);
+      setConfigMsg('Payment display configuration updated successfully.');
     } catch (err: any) {
       setConfigMsg(`Error: ${err.message}`);
     } finally {
@@ -196,6 +203,7 @@ export const AdminPage: React.FC = () => {
 
   const pendingCount = registrations.filter((r) => r.paymentStatus === 'submitted').length;
   const verifiedCount = registrations.filter((r) => r.paymentStatus === 'verified').length;
+  const rejectedCount = registrations.filter((r) => r.paymentStatus === 'rejected').length;
   const totalCount = registrations.length;
 
   return (
@@ -266,19 +274,11 @@ export const AdminPage: React.FC = () => {
 
       {activeTab === 'registrations' ? (
         <div className="space-y-6">
-          {/* Stats Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Stats Bar (Submitted / Verified / Rejected / Total) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="card-surface p-5 rounded-2xl border border-[#242436] bg-[#0f0f16] flex items-center justify-between">
               <div>
-                <span className="text-xs text-gray-400 block uppercase font-bold">Total Registrations</span>
-                <span className="text-2xl font-black text-white">{totalCount}</span>
-              </div>
-              <Users className="w-8 h-8 text-[#FF2D2D] opacity-80" />
-            </div>
-
-            <div className="card-surface p-5 rounded-2xl border border-[#242436] bg-[#0f0f16] flex items-center justify-between">
-              <div>
-                <span className="text-xs text-gray-400 block uppercase font-bold">Awaiting Review</span>
+                <span className="text-xs text-gray-400 block uppercase font-bold">Submitted</span>
                 <span className="text-2xl font-black text-amber-400">{pendingCount}</span>
               </div>
               <CreditCard className="w-8 h-8 text-amber-400 opacity-80" />
@@ -286,10 +286,26 @@ export const AdminPage: React.FC = () => {
 
             <div className="card-surface p-5 rounded-2xl border border-[#242436] bg-[#0f0f16] flex items-center justify-between">
               <div>
-                <span className="text-xs text-gray-400 block uppercase font-bold">Verified & Issued</span>
+                <span className="text-xs text-gray-400 block uppercase font-bold">Verified</span>
                 <span className="text-2xl font-black text-emerald-400">{verifiedCount}</span>
               </div>
               <CheckCircle2 className="w-8 h-8 text-emerald-400 opacity-80" />
+            </div>
+
+            <div className="card-surface p-5 rounded-2xl border border-[#242436] bg-[#0f0f16] flex items-center justify-between">
+              <div>
+                <span className="text-xs text-gray-400 block uppercase font-bold">Rejected</span>
+                <span className="text-2xl font-black text-red-400">{rejectedCount}</span>
+              </div>
+              <XCircle className="w-8 h-8 text-red-400 opacity-80" />
+            </div>
+
+            <div className="card-surface p-5 rounded-2xl border border-[#242436] bg-[#0f0f16] flex items-center justify-between">
+              <div>
+                <span className="text-xs text-gray-400 block uppercase font-bold">Total Registrations</span>
+                <span className="text-2xl font-black text-white">{totalCount}</span>
+              </div>
+              <Users className="w-8 h-8 text-[#FF2D2D] opacity-80" />
             </div>
           </div>
 
@@ -521,23 +537,38 @@ export const AdminPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="form-label text-gray-400">UPI Payment QR Code Image URL</label>
+                <label className="form-label text-gray-400">Payee Name</label>
+                <input
+                  type="text"
+                  required
+                  value={payeeName}
+                  onChange={(e) => setPayeeName(e.target.value)}
+                  placeholder="e.g. EMBEDX PCB WORKSHOP"
+                  className="input-clean bg-[#09090e] border-[#222234] text-white focus:border-[#FF2D2D]"
+                />
+              </div>
+
+              <div>
+                <label className="form-label text-gray-400">Workshop Registration Fee Amount (₹)</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  value={amount}
+                  onChange={(e) => setAmount(Number(e.target.value))}
+                  placeholder="70"
+                  className="input-clean bg-[#09090e] border-[#222234] text-[#FF2D2D] font-bold focus:border-[#FF2D2D]"
+                />
+              </div>
+
+              <div>
+                <label className="form-label text-gray-400">UPI Payment QR Code Image URL (Optional)</label>
                 <input
                   type="url"
                   value={qrImageUrl}
                   onChange={(e) => setQrImageUrl(e.target.value)}
                   placeholder="https://example.com/qr-code.png"
                   className="input-clean bg-[#09090e] border-[#222234] text-white font-mono focus:border-[#FF2D2D]"
-                />
-              </div>
-
-              <div>
-                <label className="form-label text-gray-400">Workshop Registration Fee (Fixed V1)</label>
-                <input
-                  type="text"
-                  disabled
-                  value={`₹${WORKSHOP_FEE} Exactly (Non-changeable in V1)`}
-                  className="input-clean bg-[#09090e] border-[#222234] text-[#FF2D2D] font-bold cursor-not-allowed opacity-80"
                 />
               </div>
 

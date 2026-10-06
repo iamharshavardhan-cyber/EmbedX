@@ -40,8 +40,13 @@ export const generateUniqueTicketId = (branch: string): string => {
 
 /**
  * Approve submitted payment and issue unique ticket ID.
+ * Writes UTR to usedUtrs/{utr} to prevent re-use.
  */
-export const approvePaymentAndIssueTicket = async (userId: string, branch: string): Promise<string> => {
+export const approvePaymentAndIssueTicket = async (
+  userId: string,
+  branch: string,
+  utr?: string
+): Promise<string> => {
   const regRef = doc(db, 'registrations', userId);
   const ticketId = generateUniqueTicketId(branch);
 
@@ -53,18 +58,32 @@ export const approvePaymentAndIssueTicket = async (userId: string, branch: strin
     updatedAt: serverTimestamp(),
   });
 
+  if (utr && utr.trim()) {
+    const normalizedUtr = utr.trim().toUpperCase();
+    const usedUtrRef = doc(db, 'usedUtrs', normalizedUtr);
+    await setDoc(
+      usedUtrRef,
+      {
+        uid: userId,
+        verifiedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
+
   return ticketId;
 };
 
 /**
- * Reject submitted payment.
+ * Reject submitted payment with optional reason.
  */
-export const rejectPayment = async (userId: string): Promise<void> => {
+export const rejectPayment = async (userId: string, reason?: string): Promise<void> => {
   const regRef = doc(db, 'registrations', userId);
 
   await updateDoc(regRef, {
     paymentStatus: 'rejected',
     registrationStatus: 'rejected',
+    rejectionReason: reason?.trim() || '',
     updatedAt: serverTimestamp(),
   });
 };
@@ -81,14 +100,23 @@ export const updateUserRole = async (targetUid: string, role: UserRole): Promise
 };
 
 /**
- * Super Admin: Update payment config in config/payment (fee remains 70).
+ * Super Admin: Update payment config in config/payment.
  */
-export const updatePaymentConfig = async (upiId: string, qrImageUrl: string): Promise<void> => {
+export const updatePaymentConfig = async (
+  upiId: string,
+  payeeName: string,
+  amount: number,
+  qrImageUrl?: string
+): Promise<void> => {
   const configRef = doc(db, 'config', 'payment');
   await setDoc(configRef, {
     upiId: upiId.trim(),
-    qrImageUrl: qrImageUrl.trim(),
-    expectedAmount: WORKSHOP_FEE, // FIXED AT 70
+    payeeName: payeeName.trim() || 'EMBEDX PCB WORKSHOP',
+    amount: amount || WORKSHOP_FEE,
+    expectedAmount: amount || WORKSHOP_FEE,
+    currency: 'INR',
+    note: 'PCB Workshop 2026 Registration',
+    qrImageUrl: qrImageUrl?.trim() || '',
     updatedAt: serverTimestamp(),
   }, { merge: true });
 };
