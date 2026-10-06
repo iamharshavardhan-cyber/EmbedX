@@ -34,19 +34,13 @@ service cloud.firestore {
         && request.resource.data.paymentStatus == 'pending'
         && request.resource.data.registrationStatus == 'pending'
         && request.resource.data.ticketStatus == 'unissued';
-      allow update: if isAdmin()
-        || (isOwner(uid)
-            && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['paymentStatus', 'lastPaymentSubmittedAt', 'updatedAt'])
-            && request.resource.data.paymentStatus in ['pending', 'submitted']);
+      allow update: if isAdmin() || isOwner(uid);
       allow delete: if isSuperAdmin();
 
       // Payment attempts subcollection
       match /paymentAttempts/{attemptId} {
         allow read: if isOwner(uid) || isAdmin();
-        allow create: if isOwner(uid)
-          && request.resource.data.status == 'submitted'
-          && request.resource.data.keys().hasAll(['utr', 'screenshotRef', 'expectedAmount', 'status', 'submittedAt']);
+        allow create: if isOwner(uid);
         allow update, delete: if isAdmin();
       }
     }
@@ -68,8 +62,8 @@ service cloud.firestore {
 
     // Used UTRs — prevent reuse
     match /usedUtrs/{utrId} {
-      allow read: if isAdmin();
-      allow create: if isAdmin() || isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
 
