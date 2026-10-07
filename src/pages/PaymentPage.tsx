@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import GooglePayButton from '@google-pay/button-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '@/context/AuthContext';
 import { getStudentRegistration } from '@/services/registrationService';
@@ -20,8 +19,8 @@ import {
   ShieldCheck,
   Copy,
   Check,
-  ExternalLink,
   Smartphone,
+  QrCode,
 } from 'lucide-react';
 
 export const PaymentPage: React.FC = () => {
@@ -40,16 +39,17 @@ export const PaymentPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
   const [copiedUpi, setCopiedUpi] = useState(false);
+  const [copiedMobile, setCopiedMobile] = useState(false);
+  const [qrImageError, setQrImageError] = useState(false);
 
-  const receiverUpiId = config?.upiId || '';
-  const receiverName = config?.payeeName || 'EMBEDX PCB WORKSHOP';
-  const feeAmount = config?.amount || config?.expectedAmount || 0;
-  const isConfigValid = !!config && !!config.upiId && !!feeAmount;
+  const receiverUpiId = config?.upiId || '9052899812-2@ybl';
+  const receiverName = config?.payeeName || 'Dhudhyala Chandra Kanth';
+  const receiverMobile = config?.mobileNumber || '9052899812';
+  const feeAmount = config?.amount || config?.expectedAmount || 70;
 
-  const upiPayString = isConfigValid
-    ? `upi://pay?pa=${receiverUpiId}&pn=${encodeURIComponent(receiverName)}&am=${feeAmount}&cu=INR`
-    : '';
+  const upiPayString = `upi://pay?pa=${receiverUpiId}&pn=${encodeURIComponent(receiverName)}&am=${feeAmount}&cu=INR`;
 
   useEffect(() => {
     if (!currentUser) return;
@@ -83,6 +83,13 @@ export const PaymentPage: React.FC = () => {
     setTimeout(() => setCopiedUpi(false), 2500);
   };
 
+  const handleCopyMobile = () => {
+    if (!receiverMobile) return;
+    navigator.clipboard.writeText(receiverMobile);
+    setCopiedMobile(true);
+    setTimeout(() => setCopiedMobile(false), 2500);
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const file = e.target.files?.[0];
@@ -114,11 +121,6 @@ export const PaymentPage: React.FC = () => {
 
     if (!currentUser) {
       setError('Authentication session missing. Please log in.');
-      return;
-    }
-
-    if (!isConfigValid) {
-      setError('Payment configuration unavailable. Contact organizers.');
       return;
     }
 
@@ -209,17 +211,21 @@ export const PaymentPage: React.FC = () => {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FF2D2D]/10 text-[#FF2D2D] text-xs font-bold uppercase tracking-wider mb-3 border border-[#FF2D2D]/30">
             Step 2 of 2 — Workshop Fee
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Google Pay & UPI Payment</h1>
-          <p className="text-gray-400 mt-2">Pay ₹70 via Google Pay, UPI deep link, or QR scan.</p>
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Payment Details</h1>
+          <p className="text-gray-400 mt-2">Pay ₹70 via QR scan, UPI ID, or Mobile Number.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: GPay & UPI Details */}
+          {/* Left Column: Official Payment Details */}
           <div className="space-y-6">
+            {/* Fee Card */}
             <div className="card-elevated p-6 space-y-4 border border-[#242436] bg-[#0f0f16]">
-              <span className="form-label text-gray-400">Workshop Fee</span>
+              <div className="flex items-center justify-between">
+                <span className="form-label text-gray-400 mb-0">Workshop Fee</span>
+                <span className="text-xs text-gray-400 font-medium">{receiverName}</span>
+              </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-black text-white">₹{feeAmount || 70}</span>
+                <span className="text-4xl font-black text-white">₹{feeAmount}</span>
                 <span className="text-xs text-gray-400">/ student</span>
               </div>
               <div className="text-sm text-gray-300 space-y-2 pt-4 border-t border-[#1f1f2e]">
@@ -238,124 +244,98 @@ export const PaymentPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Google Pay SDK & Instant Launch Box */}
-            {!isConfigValid ? (
-              <div className="card-elevated p-8 text-center border border-red-500/30 bg-[#0f0f16] space-y-3">
-                <AlertCircle className="w-10 h-10 text-[#FF2D2D] mx-auto" />
-                <h3 className="text-base font-bold text-white">Payment Configuration Unavailable</h3>
-                <p className="text-xs text-gray-400">
-                  Payment configuration unavailable. Contact organizers.
-                </p>
-              </div>
-            ) : (
-              <div className="card-elevated p-6 space-y-5 text-center border border-[#242436] bg-[#0f0f16]">
-                <div className="space-y-2">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF2D2D]/10 text-[#FF2D2D] text-[10px] font-extrabold uppercase tracking-widest border border-[#FF2D2D]/30">
-                    <span>GOOGLE PAY & UPI GATEWAY</span>
-                  </div>
-                  <h3 className="text-base font-bold text-white flex items-center justify-center gap-2">
-                    <Smartphone className="w-4 h-4 text-[#FF2D2D]" />
-                    <span>Instant UPI Payment</span>
-                  </h3>
+            {/* Main Payment Options Box */}
+            <div className="card-elevated p-6 space-y-6 border border-[#242436] bg-[#0f0f16]">
+              <div className="space-y-1 text-center">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF2D2D]/10 text-[#FF2D2D] text-[10px] font-extrabold uppercase tracking-widest border border-[#FF2D2D]/30">
+                  <span>OFFICIAL PAYMENT DETAILS</span>
                 </div>
-
-              {/* Direct GPay / Mobile App Launch Button */}
-              <a
-                href={upiPayString}
-                className="btn-pill w-full py-3.5 bg-gradient-to-r from-[#FF2D2D] to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-full shadow-[0_0_20px_rgba(255,45,45,0.4)] flex items-center justify-center gap-2.5 transition-all text-sm"
-              >
-                <span>Pay ₹70 via GPay / UPI App</span>
-                <ExternalLink className="w-4 h-4" />
-              </a>
-
-              {/* Official Google Pay Button Component */}
-              <div className="pt-2 flex justify-center">
-                <GooglePayButton
-                  environment="TEST"
-                  buttonColor="white"
-                  buttonType="pay"
-                  buttonSizeMode="fill"
-                  paymentRequest={{
-                    apiVersion: 2,
-                    apiVersionMinor: 0,
-                    allowedPaymentMethods: [
-                      {
-                        type: 'CARD',
-                        parameters: {
-                          allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
-                          allowedCardNetworks: ['MASTERCARD', 'VISA'],
-                        },
-                        tokenizationSpecification: {
-                          type: 'PAYMENT_GATEWAY',
-                          parameters: {
-                            gateway: 'example',
-                            gatewayMerchantId: 'exampleGatewayMerchantId',
-                          },
-                        },
-                      },
-                    ],
-                    merchantInfo: {
-                      merchantId: '12345678901234567890',
-                      merchantName: 'EmbedX PCB Workshop',
-                    },
-                    transactionInfo: {
-                      totalPriceStatus: 'FINAL',
-                      totalPriceLabel: 'Total',
-                      totalPrice: '70.00',
-                      currencyCode: 'INR',
-                      countryCode: 'IN',
-                    },
-                  }}
-                  onLoadPaymentData={(paymentRequest) => {
-                    console.log('Google Pay payment data:', paymentRequest);
-                    window.location.href = upiPayString;
-                  }}
-                  onClick={() => {
-                    window.location.href = upiPayString;
-                  }}
-                  onError={(err) => {
-                    console.log('Google Pay fallback to direct intent:', err);
-                    window.location.href = upiPayString;
-                  }}
-                />
+                <h3 className="text-base font-bold text-white flex items-center justify-center gap-2 pt-1">
+                  <QrCode className="w-4 h-4 text-[#FF2D2D]" />
+                  <span>Scan QR or Copy Details</span>
+                </h3>
               </div>
 
-              {/* QR Code Container */}
-              <div className="pt-3 border-t border-[#1f1f2e] space-y-3">
+              {/* QR Image Container */}
+              <div className="text-center space-y-2">
                 <span className="text-xs text-gray-400 font-medium block">
-                  Or scan with GPay / PhonePe / Paytm:
+                  Scan with GPay / PhonePe / Paytm:
                 </span>
-                <div className="p-4 bg-white rounded-2xl border-4 border-[#FF2D2D] inline-block mx-auto shadow-lg">
-                  <QRCodeSVG value={upiPayString} size={170} level="H" includeMargin={false} />
+                <div className="p-3 bg-white rounded-2xl border-4 border-[#FF2D2D] inline-block mx-auto shadow-lg">
+                  {!qrImageError ? (
+                    <img
+                      src="/images/payment-qr.png"
+                      alt="Payment QR Code"
+                      onError={() => setQrImageError(true)}
+                      className="w-44 h-44 object-contain mx-auto rounded-lg"
+                    />
+                  ) : (
+                    <QRCodeSVG value={upiPayString} size={176} level="H" includeMargin={false} />
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-400 font-medium">Payee: {receiverName}</p>
+              </div>
+
+              {/* Large & Copyable UPI ID */}
+              <div className="p-4 bg-[#09090e] rounded-xl border border-[#222234] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">UPI ID</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyUpi}
+                    className="px-3 py-1.5 rounded-lg bg-[#FF2D2D]/10 hover:bg-[#FF2D2D]/20 border border-[#FF2D2D]/30 text-[#FF2D2D] font-bold text-xs flex items-center gap-1.5 transition-colors"
+                  >
+                    {copiedUpi ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy UPI ID</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="text-xl sm:text-2xl font-black font-mono text-white tracking-wide break-all">
+                  {receiverUpiId}
                 </div>
               </div>
 
-              {/* Copyable UPI ID Box */}
-              <div className="p-3 bg-[#09090e] rounded-xl border border-[#222234] flex items-center justify-between gap-2 text-xs font-mono">
-                <div className="text-left overflow-hidden">
-                  <span className="text-gray-500 block text-[9px] uppercase tracking-wider mb-0.5">UPI ID</span>
-                  <span className="text-white font-bold truncate block">{receiverUpiId}</span>
+              {/* Pay via Mobile Number Info */}
+              <div className="p-4 bg-[#09090e] rounded-xl border border-[#222234] space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-1">
+                    <span className="text-gray-400 text-xs font-bold uppercase tracking-wider block">Pay via Mobile Number</span>
+                    <p className="text-xs text-amber-400/90 font-medium leading-relaxed">
+                      If UPI ID fails in your app, pay via mobile number <span className="font-mono font-bold text-white">{receiverMobile}</span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyMobile}
+                    className="px-3 py-1.5 rounded-lg bg-[#161622] hover:bg-[#1a1a2a] border border-[#2a2a3e] text-white font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0"
+                  >
+                    {copiedMobile ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Number</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCopyUpi}
-                  className="px-3 py-1.5 rounded-lg bg-[#161622] hover:bg-[#1a1a2a] border border-[#2a2a3e] text-[#FF2D2D] font-bold text-[11px] flex items-center gap-1.5 transition-colors shrink-0"
-                >
-                  {copiedUpi ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
+                <div className="text-lg font-bold font-mono text-white pt-1 flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-[#FF2D2D]" />
+                  <span>{receiverMobile}</span>
+                </div>
               </div>
             </div>
-            )}
           </div>
 
           {/* Right Column: Submission & History */}

@@ -79,6 +79,7 @@ export interface UserRoleDoc {
 export interface PaymentConfig {
   upiId: string;
   payeeName?: string;
+  mobileNumber?: string;
   amount: number;
   expectedAmount?: number;
   qrImageUrl?: string;
