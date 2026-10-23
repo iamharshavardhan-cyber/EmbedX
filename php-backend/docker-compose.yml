@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  php-backend:
+    build: .
+    container_name: embedx_php_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - APP_ENV=development
+      - PORT=8000
+      - BASE_URL=http://localhost:8000
+      - FIREBASE_API_KEY=AIzaSyB2IslI67kKSzP-2tqWjXFpuANB2zahXdY
+      - FIREBASE_PROJECT_ID=embedx-pcb-workshop

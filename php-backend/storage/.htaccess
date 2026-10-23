@@ -1,0 +1,8 @@
+# Deny all direct web access to raw files in storage
+# All access must go through the signed token streaming endpoint (/api/view)
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Deny from all
+</IfModule>
